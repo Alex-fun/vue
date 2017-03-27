@@ -1,6 +1,52 @@
 /* @flow */
 
-let len, str, chr, index, expressionPos, expressionEndPos
+/**
+ * Cross-platform code generation for component v-model
+ */
+export function genComponentModel (
+  el: ASTElement,
+  value: string,
+  modifiers: ?ASTModifiers
+): ?boolean {
+  const { number, trim } = modifiers || {}
+
+  const baseValueExpression = '$$v'
+  let valueExpression = baseValueExpression
+  if (trim) {
+    valueExpression =
+      `(typeof ${baseValueExpression} === 'string'` +
+        `? ${baseValueExpression}.trim()` +
+        `: ${baseValueExpression})`
+  }
+  if (number) {
+    valueExpression = `_n(${valueExpression})`
+  }
+  const assignment = genAssignmentCode(value, valueExpression)
+
+  el.model = {
+    value: `(${value})`,
+    expression: `"${value}"`,
+    callback: `function (${baseValueExpression}) {${assignment}}`
+  }
+}
+
+/**
+ * Cross-platform codegen helper for generating v-model value assignment code.
+ */
+export function genAssignmentCode (
+  value: string,
+  assignment: string
+): string {
+  const modelRs = parseModel(value)
+  if (modelRs.idx === null) {
+    return `${value}=${assignment}`
+  } else {
+    return `var $$exp = ${modelRs.exp}, $$idx = ${modelRs.idx};` +
+      `if (!Array.isArray($$exp)){` +
+        `${value}=${assignment}}` +
+      `else{$$exp.splice($$idx, 1, ${assignment})}`
+  }
+}
 
 /**
  * parse directive model to do the array update transform. a[idx] = val => $$a.splice($$idx, 1, val)
@@ -16,12 +62,14 @@ let len, str, chr, index, expressionPos, expressionEndPos
  *
  */
 
-export default function parseModel (val: string): Object {
+let len, str, chr, index, expressionPos, expressionEndPos
+
+export function parseModel (val: string): Object {
   str = val
   len = str.length
   index = expressionPos = expressionEndPos = 0
 
-  if (val.indexOf('[') < 0) {
+  if (val.indexOf('[') < 0 || val.lastIndexOf(']') < len - 1) {
     return {
       exp: val,
       idx: null

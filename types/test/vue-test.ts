@@ -1,6 +1,8 @@
 import Vue = require("../index");
 
 class Test extends Vue {
+  a: number;
+
   testProperties() {
     this.$data;
     this.$el;
@@ -37,7 +39,7 @@ class Test extends Vue {
       immediate: true,
       deep: false
     })();
-    this.$watch(() => {}, (val: number) => {});
+    this.$watch(() => this.a, (val: number) => {});
     this.$on("", () => {});
     this.$once("", () => {});
     this.$off("", () => {});
@@ -45,6 +47,7 @@ class Test extends Vue {
     this.$nextTick(function() {
       this.$nextTick;
     });
+    this.$nextTick().then(() => {});
     this.$createElement("div", {}, "message");
   }
 
@@ -71,6 +74,7 @@ class Test extends Vue {
       }
     });
     this.nextTick(() => {});
+    this.nextTick().then(() => {});
     this.set({}, "", "");
     this.set([true, false, true], 1, true);
     this.delete({}, "");

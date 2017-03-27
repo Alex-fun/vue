@@ -1,13 +1,15 @@
 /* @flow */
 
+import { parseFilters } from './parser/filter-parser'
+
 export function baseWarn (msg: string) {
-  console.error(`[Vue parser]: ${msg}`)
+  console.error(`[Vue compiler]: ${msg}`)
 }
 
-export function pluckModuleFunction (
+export function pluckModuleFunction<F: Function> (
   modules: ?Array<Object>,
   key: string
-): Array<Function> {
+): Array<F> {
   return modules
     ? modules.map(m => m[key]).filter(_ => _)
     : []
@@ -44,6 +46,10 @@ export function addHandler (
     delete modifiers.capture
     name = '!' + name // mark the event as captured
   }
+  if (modifiers && modifiers.once) {
+    delete modifiers.once
+    name = '~' + name // mark the event as once
+  }
   let events
   if (modifiers && modifiers.native) {
     delete modifiers.native
@@ -72,7 +78,7 @@ export function getBindingAttr (
     getAndRemoveAttr(el, ':' + name) ||
     getAndRemoveAttr(el, 'v-bind:' + name)
   if (dynamicValue != null) {
-    return dynamicValue
+    return parseFilters(dynamicValue)
   } else if (getStatic !== false) {
     const staticValue = getAndRemoveAttr(el, name)
     if (staticValue != null) {

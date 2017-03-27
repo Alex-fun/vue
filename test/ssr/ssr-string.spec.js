@@ -1,4 +1,5 @@
-import Vue from '../../dist/vue.common.js'
+import Vue from '../../dist/vue.runtime.common.js'
+import VM from 'vm'
 import { createRenderer } from '../../packages/vue-server-renderer'
 const { renderToString } = createRenderer()
 
@@ -57,6 +58,42 @@ describe('SSR: renderToString', () => {
     })
   })
 
+  it('custom component class', done => {
+    renderVmWithOptions({
+      template: '<div><cmp class="cmp"></cmp></div>',
+      components: {
+        cmp: {
+          render: h => h('div', 'test')
+        }
+      }
+    }, result => {
+      expect(result).toContain('<div server-rendered="true"><div class="cmp">test</div></div>')
+      done()
+    })
+  })
+
+  it('nested component class', done => {
+    renderVmWithOptions({
+      template: '<cmp class="outer" :class="cls"></cmp>',
+      data: { cls: { 'success': 1 }},
+      components: {
+        cmp: {
+          render: h => h('div', [h('nested', { staticClass: 'nested', 'class': { 'error': 1 }})]),
+          components: {
+            nested: {
+              render: h => h('div', { staticClass: 'inner' }, 'test')
+            }
+          }
+        }
+      }
+    }, result => {
+      expect(result).toContain('<div server-rendered="true" class="outer success">' +
+          '<div class="inner nested error">test</div>' +
+        '</div>')
+      done()
+    })
+  })
+
   it('dynamic style', done => {
     renderVmWithOptions({
       template: '<div style="background-color:black" :style="{ fontSize: fontSize + \'px\', color: color }"></div>',
@@ -66,7 +103,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<div server-rendered="true" style="font-size:14px;color:red;background-color:black"></div>'
+        '<div server-rendered="true" style="background-color:black;font-size:14px;color:red;"></div>'
       )
       done()
     })
@@ -80,7 +117,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<div server-rendered="true" style="color:red"></div>'
+        '<div server-rendered="true" style="color:red;"></div>'
       )
       done()
     })
@@ -99,7 +136,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<section server-rendered="true"><div style="color:red"></div></section>'
+        '<section server-rendered="true"><div style="color:red;"></div></section>'
       )
       done()
     })
@@ -107,13 +144,13 @@ describe('SSR: renderToString', () => {
 
   it('nested custom component style', done => {
     renderVmWithOptions({
-      template: '<comp :style="style"></comp>',
+      template: '<comp style="color: blue" :style="style"></comp>',
       data: {
         style: 'color:red'
       },
       components: {
         comp: {
-          template: '<nested style="font-size:520rem"></nested>',
+          template: '<nested style="text-align: left;" :style="{fontSize:\'520rem\'}"></nested>',
           components: {
             nested: {
               template: '<div></div>'
@@ -123,7 +160,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<div server-rendered="true" style="color:red;font-size:520rem"></div>'
+        '<div server-rendered="true" style="text-align:left;font-size:520rem;color:red;"></div>'
       )
       done()
     })
@@ -142,7 +179,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<div server-rendered="true" style="color:red"><div></div></div>'
+        '<div server-rendered="true" style="color:red;"><div></div></div>'
       )
       done()
     })
@@ -161,7 +198,7 @@ describe('SSR: renderToString', () => {
       }
     }, result => {
       expect(result).toContain(
-        '<div server-rendered="true" style="color:red"><span style="color:black"></span></div>'
+        '<div server-rendered="true" style="color:red;"><span style="color:black;"></span></div>'
       )
       done()
     })
@@ -198,6 +235,75 @@ describe('SSR: renderToString', () => {
     }, res => {
       expect(res).toContain(
         '<div server-rendered="true" value="c">b</div>'
+      )
+      done()
+    })
+  })
+
+  it('v-show directive render', done => {
+    renderVmWithOptions({
+      template: '<div v-show="false"><span>inner</span></div>'
+    }, res => {
+      expect(res).toContain(
+        '<div server-rendered="true" style="display:none;"><span>inner</span></div>'
+      )
+      done()
+    })
+  })
+
+  it('v-show directive not passed to child', done => {
+    renderVmWithOptions({
+      template: '<foo v-show="false"></foo>',
+      components: {
+        foo: {
+          template: '<div><span>inner</span></div>'
+        }
+      }
+    }, res => {
+      expect(res).toContain(
+        '<div server-rendered="true" style="display:none;"><span>inner</span></div>'
+      )
+      done()
+    })
+  })
+
+  it('v-show directive not passed to slot', done => {
+    renderVmWithOptions({
+      template: '<foo v-show="false"><span>inner</span></foo>',
+      components: {
+        foo: {
+          template: '<div><slot></slot></div>'
+        }
+      }
+    }, res => {
+      expect(res).toContain(
+        '<div server-rendered="true" style="display:none;"><span>inner</span></div>'
+      )
+      done()
+    })
+  })
+
+  it('v-show directive merging on components', done => {
+    renderVmWithOptions({
+      template: '<foo v-show="false"></foo>',
+      components: {
+        foo: {
+          render: h => h('bar', {
+            directives: [{
+              name: 'show',
+              value: true
+            }]
+          }),
+          components: {
+            bar: {
+              render: h => h('div', 'inner')
+            }
+          }
+        }
+      }
+    }, res => {
+      expect(res).toContain(
+        '<div server-rendered="true" style="display:none;">inner</div>'
       )
       done()
     })
@@ -475,7 +581,7 @@ describe('SSR: renderToString', () => {
     })
   })
 
-  it('enumrated attr', done => {
+  it('enumerated attr', done => {
     renderVmWithOptions({
       template: `
         <div>
@@ -619,7 +725,7 @@ describe('SSR: renderToString', () => {
 
   it('comment nodes', done => {
     renderVmWithOptions({
-      template: '<div><transition><div v-if="false"></test></transition></div>'
+      template: '<div><transition><div v-if="false"></div></transition></div>'
     }, result => {
       expect(result).toContain(`<div server-rendered="true"><!----></div>`)
       done()
@@ -627,14 +733,58 @@ describe('SSR: renderToString', () => {
   })
 
   it('should catch error', done => {
+    Vue.config.silent = true
     renderToString(new Vue({
       render () {
         throw new Error('oops')
       }
     }), err => {
       expect(err instanceof Error).toBe(true)
+      Vue.config.silent = false
       done()
     })
+  })
+
+  it('should accept template option', done => {
+    const renderer = createRenderer({
+      template: `<html><head></head><body><!--vue-ssr-outlet--></body></html>`
+    })
+
+    const context = {
+      head: '<meta name="viewport" content="width=device-width">',
+      styles: '<style>h1 { color: red }</style>',
+      state: { a: 1 }
+    }
+
+    renderer.renderToString(new Vue({
+      template: '<div>hi</div>'
+    }), (err, res) => {
+      expect(err).toBeNull()
+      expect(res).toContain(
+        `<html><head>${context.head}${context.styles}</head><body>` +
+        `<div server-rendered="true">hi</div>` +
+        `<script>window.__INITIAL_STATE__={"a":1}</script>` +
+        `</body></html>`
+      )
+      done()
+    }, context)
+  })
+
+  it('default value Foreign Function', () => {
+    const FunctionConstructor = VM.runInNewContext('Function')
+    const func = () => 123
+    const vm = new Vue({
+      props: {
+        a: {
+          type: FunctionConstructor,
+          default: func
+        }
+      },
+      propsData: {
+        a: undefined
+      }
+    })
+    expect(vm.a).toBe(func)
   })
 })
 
