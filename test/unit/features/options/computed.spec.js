@@ -1,4 +1,5 @@
 import Vue from 'vue'
+import testObjectOption from '../../../helpers/test-object-option'
 
 describe('Options computed', () => {
   it('basic usage', done => {
@@ -47,6 +48,8 @@ describe('Options computed', () => {
       expect(vm.$el.textContent).toBe('1')
     }).then(done)
   })
+
+  testObjectOption('computed')
 
   it('warn with setter and no getter', () => {
     const vm = new Vue({
@@ -166,5 +169,39 @@ describe('Options computed', () => {
     waitForUpdate(() => {
       expect(vm.$el.textContent).toBe('3 4')
     }).then(done)
+  })
+
+  it('warn conflict with data', () => {
+    new Vue({
+      data: {
+        a: 1
+      },
+      computed: {
+        a: () => 2
+      }
+    })
+    expect(`computed property "a" is already defined in data`).toHaveBeenWarned()
+  })
+
+  it('warn conflict with props', () => {
+    new Vue({
+      props: ['a'],
+      propsData: { a: 1 },
+      computed: {
+        a: () => 2
+      }
+    })
+    expect(`computed property "a" is already defined as a prop`).toHaveBeenWarned()
+  })
+
+  it('rethrow computed error', () => {
+    const vm = new Vue({
+      computed: {
+        a: () => {
+          throw new Error('rethrow')
+        }
+      }
+    })
+    expect(() => vm.a).toThrowError('rethrow')
   })
 })
